@@ -27,7 +27,7 @@ export default function App() {
   };
 
   return (
-    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxW: '900px', margin: '0 auto' }}>
+    <div style={{ padding: '2rem', fontFamily: 'system-ui, sans-serif', maxWidth: '900px', margin: '0 auto' }}>
       <h2>Generic Product Comparison Agent</h2>
       
       <div style={{ display: 'flex', gap: '1rem', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
