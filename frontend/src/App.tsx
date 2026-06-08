@@ -158,10 +158,13 @@ export default function App() {
     setMatrix({ headers: [], rows: [], verdict: "" });
 
     try {
-      const BACKEND_URL =
+      let BACKEND_URL =
         import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
-      const response = await fetch(`${BACKEND_URL}api/compare`, {
+        // 🚀 SENIOR FIX: Aggressively strip any trailing slashes from the configuration string
+     BACKEND_URL = BACKEND_URL.replace(/\/+$/, '');
+
+      const response = await fetch(`${BACKEND_URL}/api/compare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ item, targetSpecs: specs }),
