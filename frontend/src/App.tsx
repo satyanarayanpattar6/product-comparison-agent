@@ -161,7 +161,7 @@ export default function App() {
       const BACKEND_URL =
         import.meta.env.VITE_BACKEND_URL || "http://localhost:5000";
 
-      const response = await fetch(`${BACKEND_URL}/api/compare`, {
+      const response = await fetch(`${BACKEND_URL}api/compare`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ item, targetSpecs: specs }),
