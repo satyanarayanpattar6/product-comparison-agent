@@ -145,7 +145,7 @@ export default function App() {
   const [specs, setSpecs] = useState("Price, Pros, Cons");
   const [matrix, setMatrix] = useState({ headers: [], rows: [], verdict: "" });
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleSearch = async () => {
     if (!item.trim()) {
