@@ -1,86 +1,56 @@
 import { getJson } from "serpapi";
-
-// A generic data provider simulating a scraper or product warehouse lookup
-
+//engine: "google",
 export async function executeSearch(item) {
-  console.log(`[Agent Tool] Dynamically sourcing product data for: ${item}`);
-  
+  console.log(`[Agent Tool] Initiating live web retrieval for: ${item}`);
   try {
-    // Query Google Shopping / Search via SerpAPI to grab raw merchant snippets safely
     const response = await getJson({
-      engine: "google",
-      q: `${item} site:amazon.in OR site:flipkart.com`,
-      location: "India",
-      hl: "en",
-      gl: "in",
+      engine: "ebay",
+      _nkw: item,
+      ebay_domain: "ebay.com",
       api_key: process.env.SERPAPI_API_KEY,
     });
 
-    const searchResults = response.organic_results || [];
+    const amazonResponse = await getJson({
+      engine: "amazon",
+      amazon_domain: "amazon.in", // Targets Amazon India
+      k: item,
+      api_key: process.env.SERPAPI_API_KEY.trim(),
+    });
 
-    // Filter results to separate Amazon and Flipkart raw strings
-    const amazonContext = searchResults
-      .filter(result => result.link.includes("amazon.in"))
-      .slice(0, 2)
-      .map(r => `${r.title}: ${r.snippet}`)
-      .join("\n");
+    const amazonResults = amazonResponse.organic_results || [];
+    const flipkartResults = response.organic_results || [];
 
-    const flipkartContext = searchResults
-      .filter(result => result.link.includes("flipkart.com"))
-      .slice(0, 2)
-      .map(r => `${r.title}: ${r.snippet}`)
-      .join("\n");
+   //const searchResults = response.organic_results || [];
 
-    // Construct a live data package for the LLM agent to parse
+    // Map through results to keep titles, snippets, AND images
+    const amazonContext = amazonResults.length > 0?
+      //.filter(result => result.link.includes("amazon.in"))
+      amazonResults.slice(0, 2)
+      .map(r => {
+            const title = r.title || "Product Option";
+            const snippet = r.snippet || r.description || "View product page for information details.";
+            const img = r.thumbnail || "";
+            return `Title: ${title}, Info: ${snippet}, ImgUrl: ${img}`;
+          }) .join("\n"):"No live listings found on Amazon.";
+
+    const flipkartContext = flipkartResults.length>0
+      //.filter(result => result.link.includes("flipkart.com"))
+      ?flipkartResults.slice(0, 2)
+      .map(r => {
+            const title = r.title || "Product Option";
+            const snippet = r.snippet || "View product page for information details.";
+            // Google organic results attach the thumbnail image inside r.thumbnail
+            const img = r.thumbnail || ""; 
+            return `Title: ${title}, Info: ${snippet}, ImgUrl: ${img}`;
+          })
+          .join("\n") :"No live listings found on Flipkart.";
+
     return {
-      query: item,
-      timestamp: new Date().toISOString(),
-      sourceData: {
-        amazonRaw: amazonContext || "No live listings found on Amazon right now.",
-        flipkartRaw: flipkartContext || "No live listings found on Flipkart right now."
-      }
+      amazonRaw: amazonContext ,
+      flipkartRaw: flipkartContext
     };
-
   } catch (error) {
-    console.error("[Scraper Error] Live retrieval failed:", error);
-    // Graceful fallback for the agent flow if API limit is reached
-    return {
-      error: "Failed to pull live data due to proxy constraints.",
-      query: item
-    };
+    console.error("[Scraper Error]", error);
+    return { amazonRaw: "", flipkartRaw: "" };
   }
 }
-
-
-
-// Real-world fallback logic simulating disparate ecommerce databases
-// return {
-//     amazon: {
-//       platform: "Amazon",
-//       price: "₹1,24,999",
-//       specs: {
-//         "Processor": "M3 Pro Chip (11‑core CPU, 14‑core GPU)",
-//         "Display": "14.2-inch Liquid Retina XDR",
-//         "Battery": "Up to 18 hours",
-//         "Storage": "512GB SSD",
-//         "RAM": "18GB Unified Memory"
-//       },
-//       features: "MagSafe 3, Thunderbolt 4 ports, Studio-quality mics",
-//       pros: "Fast Prime delivery, superior handling of electronics returns.",
-//       cons: "No instant bank discount available currently."
-//     },
-//     flipkart: {
-//       platform: "Flipkart",
-//       price: "₹1,21,900",
-//       specs: {
-//         "Processor": "M3 Pro Chip (11‑core CPU, 14‑core GPU)",
-//         "Display": "14.2-inch Liquid Retina XDR",
-//         "Battery": "Up to 18 hours",
-//         "Storage": "512GB SSD",
-//         "RAM": "18GB Unified Memory"
-//       },
-//       features: "Liquid Retina display, high-fidelity 6-speaker sound system",
-//       pros: "₹3,099 cheaper base price, extra discount with HDFC cards.",
-//       cons: "Open-box verification mandatory, delivery might take 3 days longer."
-//     }
-//   };

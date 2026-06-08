@@ -3,7 +3,10 @@ import { OpenAI } from 'openai';
 import { executeSearch } from '../tools/scraper.js';
 
 const router = express.Router();
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+//console.log("Raw Key Value:", process.env.OPENAI_API_KEY);
+
+const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() });
 
 router.post('/api/compare', async (req, res) => {
   // Ensure we safely destructure the fields provided by your dynamic frontend input boxes
@@ -16,32 +19,33 @@ router.post('/api/compare', async (req, res) => {
   try {
     // 🪲 FIX 1: Explicitly await the live SerpAPI scraper and hold execution
     const liveEcomData = await executeSearch(item);
+    console.log("liveEcomData ---- :", liveEcomData.amazonRaw);
 
     console.log(`[Agent Orchestrator] Live data safely retrieved for ${item}. Sending to OpenAI...`);
 
     // 🪲 FIX 2: Reconstruct a clean system prompt forcing structured adherence
-    const systemInstruction = `You are an advanced E-commerce Data Extraction Agent. 
-    Your strict objective is to look ONLY at the provided raw search engine context data for Amazon and Flipkart and extract information matching the user's requested features.
+    const systemInstruction = `You are a universal product evaluation engine. You handle any category: cars, bikes, electronics, grinders, appliances, etc.
+          
+Extract values matching these requested aspects: [${targetSpecs}].
+CRITICAL: You must also create an aspect named "Product Image" as the first row, mapping the found "ImgUrl" from the dataset for each platform.
 
-    Requested Specifications to compare: [${targetSpecs}]
-
-    Rules:
-    1. Extract absolute data points from the text. If an aspect is completely missing from the raw snippet, write "Not specified in live listing".
-    2. Do NOT use placeholder values like "Intel Core i7" or "$899" unless they explicitly appear in the provided payload text below.
-    3. Generate a definitive "verdict" string based strictly on the prices and features found.
-
-    Your response must match this exact JSON architecture:
+Your response must follow this strict JSON format architecture:
+{
+  "headers": ["Specification/Feature", "Amazon", "Ebay"],
+  "rows": [
     {
-      "headers": ["Specification/Feature", "Amazon", "Flipkart"],
-      "rows": [
-        {
-          "specName": "Price",
-          "amazonValue": "Value extracted from Amazon data",
-          "flipkartValue": "Value extracted from Flipkart data"
-        }
-      ],
-      "verdict": "Clear purchase reasoning string."
-    }`;
+      "specName": "Product Image",
+      "amazonValue": "Value extracted based on query",
+      "flipkartValue": "Value extracted based on query"
+    },
+    {
+      "specName": "Price",
+      "amazonValue": "Value extracted based on query",
+      "EbayValue": "Value extracted based on query"
+    }
+  ],
+  "verdict": "Detailed shopping verdict."
+}`;
 
     // 🪲 FIX 3: Run the Completion using JSON Mode execution
     const completion = await openai.chat.completions.create({
@@ -54,6 +58,8 @@ router.post('/api/compare', async (req, res) => {
           content: `Analyze this dynamic raw data for the item "${item}".
           Filter and display metrics for these specific properties: "${targetSpecs}"
           
+          CRITICAL INSTRUCTION FOR IMAGES: For the "Product Image" row, look closely at the "ImgUrl" parameter inside the datasets. You must copy the exact, unedited web address string (starting with http) directly into the value field. Do not summarize or alter the link.
+
           --- LIVE DATA DATASET ---
           ${JSON.stringify(liveEcomData)}
           -------------------------`
@@ -64,6 +70,7 @@ router.post('/api/compare', async (req, res) => {
 
     // Parse the safe structured response back to your React frontend component
     const structuredMatrix = JSON.parse(completion.choices[0].message.content);
+    //console.log(structuredMatrix)
     return res.status(200).json(structuredMatrix);
 
   } catch (error) {
@@ -73,3 +80,95 @@ router.post('/api/compare', async (req, res) => {
 });
 
 export default router;
+
+
+
+// import express from 'express';
+// import { OpenAI } from 'openai';
+// import { executeSearch } from '../tools/scraper.js';
+
+// const router = express.Router();
+// const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY.trim() });
+
+// router.post('/api/compare', async (req, res) => {
+//   const { item, targetSpecs } = req.body;
+
+//   try {
+//     const liveEcomData = await executeSearch(item);
+
+//     // 🚀 Improved System Instructions with explicit rule structures
+//     const systemInstruction = `You are a universal product evaluation data extraction engine.
+//     Analyze the provided raw e-commerce search dataset and organize metrics matching the user requested parameters.
+    
+//     CRITICAL PROMPT LAWS:
+//     1. The very first entry in the rows dataset array must have a specName of exactly "Product Image".
+//     2. Extract the unedited, full raw 'ImgUrl' string from the provided data package into the image row fields.
+//     3. If an image or text spec value does not exist in the provided text dataset, use the string "N/A". Never hallucinate a link.`;
+
+//     // 🔒 Define the rigid Schema contract your React table expects
+//     const responseSchema = {
+//       name: "comparison_matrix",
+//       strict: true, // Forces absolute compliance to this layout
+//       schema: {
+//         type: "object",
+//         properties: {
+//           headers: {
+//             type: "array",
+//             items: { type: "string" },
+//             description: "An array representing table headers, e.g. ['Specification/Feature', 'Amazon', 'Flipkart']"
+//           },
+//           rows: {
+//             type: "array",
+//             items: {
+//               type: "object",
+//               properties: {
+//                 specName: { type: "string" },
+//                 amazonValue: { type: "string" },
+//                 flipkartValue: { type: "string" }
+//               },
+//               required: ["specName", "amazonValue", "flipkartValue"],
+//               additionalProperties: false
+//             }
+//           },
+//           verdict: { 
+//             type: "string", 
+//             description: "A summary advising the user on which platform is optimal based on price and features." 
+//           }
+//         },
+//         required: ["headers", "rows", "verdict"],
+//         additionalProperties: false
+//       }
+//     };
+
+//     // Execute the completions call using the strict json_schema framework
+//     const completion = await openai.chat.completions.create({
+//       model: 'gpt-4o',
+//       response_format: { 
+//         type: "json_schema", 
+//         json_schema: responseSchema // 👈 Passes the schema contract to the LLM core
+//       },
+//       messages: [
+//         { role: 'system', content: systemInstruction },
+//         {
+//           role: 'user',
+//           content: `Analyze this raw marketplace search payload for the item "${item}".
+//           Target features to isolate: "${targetSpecs}"
+          
+//           --- LIVE DATA DATASET ---
+//           ${JSON.stringify(liveEcomData)}
+//           -------------------------`
+//         }
+//       ],
+//       temperature: 0.1 // Kept low to maximize precision mapping
+//     });
+
+//     const structuredMatrix = JSON.parse(completion.choices[0].message.content);
+//     return res.status(200).json(structuredMatrix);
+
+//   } catch (error) {
+//     console.error("Agent Routing Exception:", error);
+//     return res.status(500).json({ error: 'Failed to process matrix format' });
+//   }
+// });
+
+// export default router;

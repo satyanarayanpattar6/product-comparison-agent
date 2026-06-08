@@ -2,6 +2,8 @@ import 'dotenv/config';
 import express from 'express';
 import cors from 'cors';
 import agentRouter from './routes/agent.js';
+import dotenv from 'dotenv';
+dotenv.config({ override: true });
 
 const app = express();
 app.use(cors());
